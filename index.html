@@ -1,0 +1,338 @@
+<style type="text/css">
+	.B { position:absolute; border:3px solid;}
+	.D { position:absolute; background:black; border:3px solid;
+	     padding:3px; border-color:#444 #CCC #CCC #444;}
+	.L1 { background:#CCC; border-color:#FFF #AAA #AAA #FFF;}
+	.L2 { background:#E00; border-color:#E88 #A00 #A00 #E88;}
+	.L3 { background:#08F; border-color:#8CF #04C #04C #8CF;}
+	.L4 { background:#DD0; border-color:#FF8 #AA0 #AA0 #FF8;}
+	.L5 { background:#0D0; border-color:#8D8 #0A0 #0A0 #8D8;}
+	.L6 { background:#0EE; border-color:#8EE #0AA #0AA #8EE;}
+	.L7 { background:#F80; border-color:#FC8 #C60 #C60 #FC8;}
+	.D1 { background:#888; border-color:#CCC #444 #444 #CCC;}
+	.D2 { background:#A00; border-color:#E00 #500 #500 #E00;}
+	.D3 { background:#04C; border-color:#08F #026 #026 #08F;}
+	.D4 { background:#AA0; border-color:#DD0 #550 #550 #DD0;}
+	.D5 { background:#0A0; border-color:#0D0 #050 #050 #0D0;}
+	.D6 { background:#0AA; border-color:#0EE #055 #055 #0EE;}
+	.D7 { background:#C60; border-color:#F80 #630 #630 #F80;}
+	.D8 { background:#DDD; border-color:#FFF #BBB #BBB #FFF;}
+	.D9 { background:#666; border-color:#888 #444 #444 #888;}
+</style> 
+
+<script type="text/javascript">
+
+function updateDisplayFast() {
+	var i, j;
+	for(i=0;i<currentP.dim;i++) for(j=0;j<currentP.dim;j++)
+		if(ox+i>=0&&oy+j>=0&&ox+i<col&&oy+j<row&&!sq[ox+i][oy+j])
+			TD[ox+i][oy+j].setColor(0, false);
+	for(i=0;i<currentP.dim;i++) for(j=0;j<currentP.dim;j++)
+		if(x+i<col&&y+j<row&&currentP[i][j])
+			TD[x+i][y+j].setColor(currentP.color, true);
+	ox=x; oy=y; 
+}
+function updateDisplay() {
+	var i, j; for(i=0;i<col;i++) for(j=0;j<row;j++) TD[i][j].setColor(sq[i][j], false);
+	if(!clearing)
+		for(i=0;i<currentP.dim;i++) for(j=0;j<currentP.dim;j++)
+			if(currentP[i][j]) TD[x+i][y+j].setColor(currentP.color, true);
+	updateM();
+	ox=x; oy=y;
+}
+function updateM() { Test.innerHTML="Score: "+nformat(score)+"<br>Level: "+level;}
+function nformat(n) { return n.toString().replace(/(.)(...)S/, "S1,S2");}
+function random(n) { return Math.floor(Math.random()*n);}
+function sqSetColor(c, lt) { this.className="B "+(lt?"L":"D")+c;}
+
+function checkMove(dx, dy, cs) {
+	var i, j;
+	for(i=0;i<currentP.dim;i++) for(j=0;j<currentP.dim;j++)
+		if(currentP[i][j]) {
+			if(x+i+dx<0||x+i+dx>=col||y+j+dy<0||y+j+dy>=row) return false;
+			if(!cs&&sq[x+i+dx][y+j+dy]) return false;
+		}
+	return true;
+}
+function rotate() {
+	var tP=emptyPiece(currentP.color, currentP.dim), j, sP=currentP;
+	for(i=0;i<currentP.dim;i++) for(j=0;j<currentP.dim;j++)
+		tP[j][currentP.dim-1-i]=currentP[i][j];
+	currentP=tP;
+	if(!checkMove(0, 0)) {
+		if(checkMove(0, +1)) y++;
+		else if(checkMove(0, -1)) y--;
+		else if(checkMove(+1, 0)) x++;
+		else if(checkMove(-1, 0)) x--;
+		else if(currentP.dim==4) { // for the bar
+			if(checkMove(0, -2)) y-=2;
+			else if(checkMove(+2, 0)) x+=2;
+			else if(checkMove(-2, 0)) x-=2;
+			else currentP=sP; 
+		} else currentP=sP; 
+	}
+}
+function step(time) {
+	if(gameOver||time!=timing) return;
+	if(ss) { M.innerText=ss; score+=ss; ss=0;}
+	else M.innerText="";
+
+	if(clearing) clear();
+	if(nexting) nextPiece();
+	else {
+		drop(); 
+		if(clearing) updateDisplay();
+		else updateDisplayFast();
+	}
+	setTimeout("step("+time+")", speed); 
+}
+function clear() {
+	var i, j, k, n=0, allClear=true, m="";
+
+	if(combo>1) m=combo+" Combos!";
+	else if(combo) m="Combo!";
+	for(j=0;j<row;j++)
+		while(rowBit[j]==fullBit) {
+			clearCount++; n++;
+			for(k=j+1;k<row+1;k++) {
+				rowBit[k-1]=rowBit[k];
+				for(i=0;i<col;i++) sq[i][k-1]=sq[i][k];
+			}
+			for(i=0;i<col;i++) sq[i][row+1]=0;
+			rowBit[row+1]=0; 
+		}
+	ss+=level*100*n*n*(combo+1);
+	for(i=0;i<col&&allClear;i++) for(j=0;j<row&&allClear;j++)
+		if(sq[i][j]) allClear=false;
+	if(allClear) {
+		m="ALL CLEAR!"+(m?"<br>"+m:"");
+		ss+=level*10000;
+	}
+	if(clearCount>=15&&level<9) {
+		clearCount=0;
+		speed-=50;
+		level++;
+		m="Level "+level+(m?"<br>"+m:"");
+	}
+	updateM();
+	M.innerHTML=m;
+	clearing=false;
+	combo++;
+}
+function drop() {
+	var clr=false, i, j;
+	if(checkMove(0, -1)) y--;
+	else {
+		ss+=level*10; 
+		for(i=0;i<currentP.dim;i++) for(j=0;j<currentP.dim;j++)
+			if(currentP[i][j]) {
+				sq[x+i][y+j]=currentP.color;
+				rowBit[y+j]+=Bit[x+i];
+			}
+		for(j=0;j<row;j++) if(rowBit[j]==fullBit) {
+			clr=true;
+			for(i=0;i<col;i++) sq[i][j]=8;
+		}
+		nexting=true; timing++;
+		if(clr) clearing=true;
+		else combo=0;
+		setTimeout("step("+timing+")", 250-level*10);
+	}
+}
+function nextPiece() {
+	var i, j;
+	currentP=data[next];
+	x=Math.floor((col-currentP.dim)/2);
+	y=row-currentP.dim;
+	ox=x; oy=y;
+	while(checkMove(0, 1, true)) y++;
+	if(!checkMove(0, 0)) {
+		gameOver=true;
+		clearing=true;
+		M.innerText="GAME OVER";
+		for(i=0;i<col;i++) for(j=0;j<row;j++) if(sq[i][j]) sq[i][j]=9;
+		updateDisplay();
+		timing++; return;
+	}
+	next=random(7);
+	for(i=0;i<4;i++) for(j=0;j<4;j++)
+		if(i<data[next].dim&&j<data[next].dim&&data[next][i][j])
+			ND[i][j].setColor(data[next].color, true);
+		else ND[i][j].setColor(0); 
+	nexting=false;
+	updateDisplay();
+}
+function allDrop() {
+	var n=0;
+	while(checkMove(0, -1)) { y--; n++;}
+	ss+=level*5*n;
+	drop();
+} 
+
+// Keyboard
+
+function bdkd() {
+	var kc=event.keyCode, i, j;
+
+	if(gameOver||kDown||pausing&&kc!=17) return false;
+	if(!nexting) {
+        	if(kc==17) {
+			pausing=!pausing;
+	                if(!pausing) {
+                		M.innerText="";
+		                setTimeout("step("+timing+")", speed);
+        		        return false;
+                	} else {
+                		timing++;
+		                M.innerText="paused";
+		        }
+		}
+        	if(kc==37&&checkMove(-1, 0)) x--;
+			if(kc==39&&checkMove(+1, 0)) x++;
+	        if(kc==40) drop();
+	        if(kc==38) rotate();
+	        if(kc==32) allDrop();
+	        if(clearing) updateDisplay();
+	        else updateDisplayFast();
+        	if(kc==37||kc==39) {
+		        kDown=kc;
+			setTimeout("kRepeat("+kc+")", 100);
+		}
+	}
+	event.cancelBubble=true;
+	return false;
+}
+function kRepeat(kc) {
+	if(kDown!=kc) return;
+	if(nexting) kDown=0;
+	if(kc==37&&checkMove(-1, 0)) x--;
+	if(kc==39&&checkMove(+1, 0)) x++;
+	updateDisplayFast();
+	setTimeout("kRepeat("+kc+")", 30);
+}
+var kDown=0;
+
+function gameStart() {
+     var i, j;
+     for(j=0;j<row+2;j++) {
+          rowBit[j]=0;
+          for(i=0;i<col;i++) sq[i][j]=0;
+     }
+     gameOver=false;
+     paused=false;
+     clearing=false;
+     M.innerText="";
+     timing++;
+     level=1; speed=500; score=0;
+     nextPiece();
+     setTimeout("step("+timing+")", speed);
+     document.body.focus();
+}
+
+// General Data
+
+var Bit=new Array(), fullBit;
+var speed=500, level=1, ss=0, score=0;
+
+var gameOver=true, pausing=false;
+var clearing=false, nexting=true, timing=0, combo=0;
+
+var x=0, y=0, ox=0, oy=0;
+var col=10, row=17, size=25;
+
+var sq=new Array(col);
+var rowBit=new Array(row+2); // For fast detecting a completed row.
+var clearCount=0;
+
+fullBit=(1<<col)-1;
+for(i=0;i<col;i++) {
+     Bit.push(1<<i);
+     sq[i]=new Array(row+2);
+     for(j=0;j<row+2;j++) sq[i][j]=0;
+}
+for(j=0;j<row+2;j++) rowBit[j]=0;
+
+function emptyPiece(color, dim) {
+     var arr=(dim==4?[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]]:
+          dim==3?[[0,0,0],[0,0,0],[0,0,0]]:[[0,0],[0,0]]);
+     arr.color=color, arr.dim=dim; return arr;
+}
+
+function createPiece(arr, color, dim) { arr.color=color; arr.dim=dim; return arr;}
+
+var data=[
+   createPiece([[1,1],[1,1]], 1, 2),
+   createPiece([[0,1,0],[1,1,0],[1,0,0]], 2, 3),
+   createPiece([[1,0,0],[1,1,0],[0,1,0]], 3, 3),
+   createPiece([[0,1,0,0],[0,1,0,0],[0,1,0,0],[0,1,0,0]], 4, 4),
+   createPiece([[0,1,1],[0,1,0],[0,1,0]], 5, 3),
+   createPiece([[0,1,0],[0,1,0],[0,1,1]], 6, 3),
+   createPiece([[0,1,0],[1,1,0],[0,1,0]], 7, 3)
+];
+
+var currentP;
+var next=random(7);
+
+</script>
+
+<body onKeyDown="bdkd()" onKeyUp="kDown=false;">
+
+<div id="DIV" class="D"></div>
+<div id="DIVN" class="D"></div>
+<div id="N" style="position:absolute;">
+	<div id="Test" style="font-size:20px;">Score: 0<br>Level: 1</div>
+	<br>
+	<input type="button" value="Start" onclick="gameStart()"
+		onKeyDown="return false;">
+	<br><br>
+	Press up to rotate.<br>
+	Press Space to drop.<br>
+	Press Ctrl to pause.<br>
+	<br>
+	Higher drops and combos give more points.
+</div>
+<div id="M" style="position:absolute; color:yellow; font-size:20px;"></div>
+
+<script type="text/javascript">
+
+with(document.styleSheets[0].rules[0]) {
+	style.height=(size-10)+"px";
+	style.width=(size-10)+"px";
+}
+
+var TD=new Array(col);
+for(i=0;i<col;i++) {
+	TD[i]=new Array(row);
+	for(j=0;j<row;j++) {
+		with(TD[i][j]=document.createElement("div")) {
+			style.left=i*size+5+"px";
+			style.top=(row-1-j)*size+5+"px";
+		}
+		TD[i][j].setColor=sqSetColor;
+		DIV.appendChild(TD[i][j]);
+	}
+}
+
+DIV.style.height=size*row+"px";
+DIV.style.width=size*col+"px";
+DIVN.style.height=DIVN.style.width=size*4+"px";
+DIVN.style.left=size*col+40+"px";
+N.style.top=size*4+40+"px";
+N.style.left=size*col+40+"px";
+M.style.top="20px";
+M.style.left="20px";
+
+var ND=new Array(4);
+for(i=0;i<4;i++) {
+	ND[i]=new Array(4);
+	for(j=0;j<4;j++) {
+		with(ND[i][j]=document.createElement("div")) {
+        		style.left=i*size+5+"px";
+			style.top=(3-j)*size+5+"px";
+		}
+		ND[i][j].setColor=sqSetColor;
+		DIVN.appendChild(ND[i][j]);
+	}
+}
+
+</script>
